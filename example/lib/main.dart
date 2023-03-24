@@ -10,12 +10,7 @@ void main() {
   runApp(MyApp());
 }
 
-///
-/// Whenever a button is clicked, this method will be invoked with a tag (As tag is unique for every button, it helps in identifying the button).
-/// You can check for the tag value and perform the relevant action for the button click
-@pragma('vm:entry-point')
 void callBack(String tag) {
-  WidgetsFlutterBinding.ensureInitialized();
   print(tag);
   switch (tag) {
     case "simple_button":
@@ -47,7 +42,10 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _initPlatformState();
     _requestPermissions();
-    SystemAlertWindow.registerOnClickListener(callBack);
+    SystemAlertWindow.registerOnClickListener((call) {
+      SystemAlertWindow.closeSystemWindow(
+          prefMode: SystemWindowPrefMode.OVERLAY);
+    });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.

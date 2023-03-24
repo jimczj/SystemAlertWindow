@@ -2,6 +2,7 @@ package in.jvapps.system_alert_window;
 
 import static in.jvapps.system_alert_window.services.WindowServiceNew.INTENT_EXTRA_IS_CLOSE_WINDOW;
 import static in.jvapps.system_alert_window.services.WindowServiceNew.INTENT_EXTRA_IS_UPDATE_WINDOW;
+import static in.jvapps.system_alert_window.utils.Constants.BACKGROUND_CHANNEL;
 import static in.jvapps.system_alert_window.utils.Constants.CHANNEL;
 import static in.jvapps.system_alert_window.utils.Constants.INTENT_EXTRA_PARAMS_MAP;
 
@@ -50,14 +51,15 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 import io.flutter.view.FlutterCallbackInformation;
 
 public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, ActivityAware, MethodCallHandler {
+    // 后台传输 channel id
+    static public MethodChannel backgroundChannel;
 
     private final String flutterEngineId = "system_alert_window_engine";
     private Context mContext;
     private Activity mActivity;
     public AtomicBoolean sIsIsolateRunning = new AtomicBoolean(false);
-
     private MethodChannel methodChannel;
-    private MethodChannel backgroundChannel;
+
     public int ACTION_MANAGE_OVERLAY_PERMISSION_REQUEST_CODE = 1237;
     private final String TAG = "SAW:Plugin";
 
@@ -103,16 +105,18 @@ public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, 
     public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
         this.mContext = flutterPluginBinding.getApplicationContext();
         LogUtils.getInstance().setContext(this.mContext);
+        backgroundChannel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), BACKGROUND_CHANNEL, JSONMethodCodec.INSTANCE);
         this.methodChannel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), CHANNEL, JSONMethodCodec.INSTANCE);
         this.methodChannel.setMethodCallHandler(this);
-        LogUtils.getInstance().d(TAG, "onAttachedToEngine");
     }
 
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
         this.mContext = null;
+        backgroundChannel.setMethodCallHandler(null);
         this.methodChannel.setMethodCallHandler(null);
-        LogUtils.getInstance().d(TAG, "onAttachedToEngine");
+        backgroundChannel = null;
+        LogUtils.getInstance().d(TAG, "onDetachedFromEngine");
         LogUtils.getInstance().setContext(null);
     }
 
@@ -308,49 +312,32 @@ public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, 
     }
 
     public void startCallBackHandler(Context context) {
-        SharedPreferences preferences = context.getSharedPreferences(Constants.SHARED_PREF_SYSTEM_ALERT_WINDOW, 0);
-        long callBackHandle = preferences.getLong(Constants.CALLBACK_HANDLE_KEY, -1);
-        LogUtils.getInstance().d(TAG, "onClickCallBackHandle " + callBackHandle);
-        if (callBackHandle != -1) {
-            FlutterCallbackInformation callback = FlutterCallbackInformation.lookupCallbackInformation(callBackHandle);
-            if (callback == null) {
-                LogUtils.getInstance().e(TAG, "callback handle not found");
-                return;
-            }
-            FlutterEngine backgroundEngine = new FlutterEngine(context);
+//        SharedPreferences preferences = context.getSharedPreferences(Constants.SHARED_PREF_SYSTEM_ALERT_WINDOW, 0);
+//        long callBackHandle = preferences.getLong(Constants.CALLBACK_HANDLE_KEY, -1);
+//        LogUtils.getInstance().d(TAG, "onClickCallBackHandle " + context);
+//        LogUtils.getInstance().d(TAG, "onClickCallBackHandle.methodChannel " + context);
+//
+//        if (callBackHandle != -1) {
+//            FlutterCallbackInformation callback = FlutterCallbackInformation.lookupCallbackInformation(callBackHandle);
+//            if (callback == null) {
+//                LogUtils.getInstance().e(TAG, "callback handle not found");
+//                return;
+//            }
+            // FlutterEngine backgroundEngine = new FlutterEngine(context);
             //backgroundEngine.getServiceControlSurface().attachToService(new WindowServiceNew(), null, false);
-            backgroundChannel = new MethodChannel(backgroundEngine.getDartExecutor().getBinaryMessenger(), Constants.BACKGROUND_CHANNEL, JSONMethodCodec.INSTANCE);
-            sIsIsolateRunning.set(true);
-            DartExecutor.DartCallback dartCallback = new DartExecutor.DartCallback(context.getAssets(), FlutterInjector.instance().flutterLoader().findAppBundlePath(), callback);
-            backgroundEngine.getDartExecutor().executeDartCallback(dartCallback);
-        }
+            // backgroundChannel = new MethodChannel(backgroundEngine.getDartExecutor().getBinaryMessenger(), Constants.BACKGROUND_CHANNEL, JSONMethodCodec.INSTANCE);
+            // sIsIsolateRunning.set(true);
+            // DartExecutor.DartCallback dartCallback = new DartExecutor.DartCallback(context.getAssets(), FlutterInjector.instance().flutterLoader().findAppBundlePath(), callback);
+            // backgroundEngine.getDartExecutor().executeDartCallback(dartCallback);
+//        }
     }
 
     public void invokeCallBack(Context context, String type, Object params) {
-        List<Object> argumentsList = new ArrayList<>();
-        LogUtils.getInstance().d(TAG, "invoking callback for tag " + params);
-        SharedPreferences preferences = context.getSharedPreferences(Constants.SHARED_PREF_SYSTEM_ALERT_WINDOW, 0);
-        long codeCallBackHandle = preferences.getLong(Constants.CODE_CALLBACK_HANDLE_KEY, -1);
-        //LogUtils.getInstance().i(TAG, "codeCallBackHandle " + codeCallBackHandle);
-        if (codeCallBackHandle == -1) {
-            LogUtils.getInstance().e(TAG, "invokeCallBack failed, as codeCallBackHandle is null");
-        } else {
-            argumentsList.add(codeCallBackHandle);
-            argumentsList.add(type);
-            argumentsList.add(params);
-            if (sIsIsolateRunning.get()) {
-                try {
-                    LogUtils.getInstance().d(TAG, "Invoking on method channel");
-                    int[] retries = {2};
-                    invokeCallBackToFlutter(backgroundChannel, "callBack", argumentsList, retries);
-                    //backgroundChannel.invokeMethod("callBack", argumentsList);
-                } catch (Exception ex) {
-                    LogUtils.getInstance().e(TAG, "Exception in invoking callback " + ex);
-                }
-            } else {
-                LogUtils.getInstance().e(TAG, "invokeCallBack failed, as isolate is not running");
-            }
-        }
+        HashMap<String, Object> resultMap = new HashMap<>();
+        resultMap.put("type", type);
+        resultMap.put("params", params);
+        backgroundChannel.invokeMethod("callback", resultMap);
+        LogUtils.getInstance().e(TAG, "callback " + resultMap);
     }
 
     private void invokeCallBackToFlutter(final MethodChannel channel, final String method, final List<Object> arguments, final int[] retries) {
