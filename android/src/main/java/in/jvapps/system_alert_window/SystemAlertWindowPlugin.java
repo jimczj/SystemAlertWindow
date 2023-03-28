@@ -35,6 +35,7 @@ import in.jvapps.system_alert_window.utils.Commons;
 import in.jvapps.system_alert_window.utils.Constants;
 import in.jvapps.system_alert_window.utils.LogUtils;
 import in.jvapps.system_alert_window.utils.NotificationHelper;
+import in.jvapps.system_alert_window.utils.UiBuilder;
 import io.flutter.FlutterInjector;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.FlutterEngineCache;
@@ -108,6 +109,7 @@ public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, 
         backgroundChannel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), BACKGROUND_CHANNEL, JSONMethodCodec.INSTANCE);
         this.methodChannel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), CHANNEL, JSONMethodCodec.INSTANCE);
         this.methodChannel.setMethodCallHandler(this);
+        UiBuilder.setPlugin(this);
     }
 
     @Override
@@ -115,6 +117,7 @@ public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, 
         this.mContext = null;
         backgroundChannel.setMethodCallHandler(null);
         this.methodChannel.setMethodCallHandler(null);
+        UiBuilder.setPlugin(null);
         backgroundChannel = null;
         LogUtils.getInstance().d(TAG, "onDetachedFromEngine");
         LogUtils.getInstance().setContext(null);
@@ -264,17 +267,8 @@ public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, 
                     if (prefMode == null) {
                         prefMode = "default";
                     }
-                    if (checkPermission(!isBubbleMode(prefMode))) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isBubbleMode(prefMode)) {
-                            NotificationHelper.getInstance(mContext).dismissNotification();
-                        } else {
-                            final Intent i = new Intent(mContext, WindowServiceNew.class);
-                            i.putExtra(INTENT_EXTRA_IS_CLOSE_WINDOW, true);
-                            //WindowService.dequeueWork(mContext, i);
-                            mContext.startService(i);
-                        }
-                        result.success(true);
-                    }
+                    boolean res = closeSystemWindow(prefMode);
+                    result.success(res);
                     break;
                 case "registerCallBackHandler":
                     try {
@@ -336,8 +330,40 @@ public class SystemAlertWindowPlugin extends Activity implements FlutterPlugin, 
         HashMap<String, Object> resultMap = new HashMap<>();
         resultMap.put("type", type);
         resultMap.put("params", params);
-        backgroundChannel.invokeMethod("callback", resultMap);
+        backgroundChannel.invokeMethod("callback", resultMap, new MethodChannel.Result() {
+            @Override
+            public void success(Object o) {
+                LogUtils.getInstance().i(TAG, "Invoke call back success");
+            }
+
+            @Override
+            public void error(String s, String s1, Object o) {
+                closeSystemWindow("overlay");
+                LogUtils.getInstance().i(TAG, "Invoke call back error");
+            }
+
+            @Override
+            public void notImplemented() {
+                LogUtils.getInstance().i(TAG, "Invoke call back notImplemented");
+                closeSystemWindow("overlay");
+            }
+        });
         LogUtils.getInstance().e(TAG, "callback " + resultMap);
+    }
+
+    private boolean closeSystemWindow(String prefMode) {
+        if (checkPermission(!isBubbleMode(prefMode))) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isBubbleMode(prefMode)) {
+                NotificationHelper.getInstance(mContext).dismissNotification();
+            } else {
+                final Intent i = new Intent(mContext, WindowServiceNew.class);
+                i.putExtra(INTENT_EXTRA_IS_CLOSE_WINDOW, true);
+                //WindowService.dequeueWork(mContext, i);
+                mContext.startService(i);
+            }
+            return true;
+        }
+        return false;
     }
 
     private void invokeCallBackToFlutter(final MethodChannel channel, final String method, final List<Object> arguments, final int[] retries) {

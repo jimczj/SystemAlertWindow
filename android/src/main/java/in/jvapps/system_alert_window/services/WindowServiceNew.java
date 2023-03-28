@@ -83,7 +83,7 @@ public class WindowServiceNew extends Service implements View.OnTouchListener {
             pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
         }
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Overlay window service is running")
+                .setContentTitle("到站了悬浮窗")
                 .setSmallIcon(R.drawable.ic_desktop_windows_black_24dp)
                 .setContentIntent(pendingIntent)
                 .build();

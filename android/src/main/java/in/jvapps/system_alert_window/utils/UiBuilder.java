@@ -19,9 +19,13 @@ import in.jvapps.system_alert_window.models.Padding;
 public class UiBuilder {
 
     private static UiBuilder _instance;
-    private final SystemAlertWindowPlugin systemAlertWindowPlugin = new SystemAlertWindowPlugin();
+    private static SystemAlertWindowPlugin systemAlertWindowPlugin;;
 
     private UiBuilder() {
+    }
+
+    public static void setPlugin(SystemAlertWindowPlugin plugin) {
+        systemAlertWindowPlugin = plugin;
     }
 
     public static UiBuilder getInstance() {
